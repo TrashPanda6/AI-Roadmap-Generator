@@ -1,0 +1,7 @@
+flask
+flask-cors
+requests
+sqlite3
+langchain
+langchain-ollama
+langchain-chroma

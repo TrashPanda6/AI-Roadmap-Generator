@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SkillStack LLM MVP</title>
+  <style>
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        background: linear-gradient(180deg, #f6f7fb, #ffffff);
+        color: var(--text-main);
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 2.5rem 1.2rem;
+    }
+
+    h1 {
+      text-align: center;
+      color: #333;
+    }
+
+    form {
+      display: flex;
+      flex-direction: column;
+      gap: 0.8rem;
+      margin-bottom: 1.5rem;
+    }
+
+    input, button {
+      padding: 0.6rem;
+      font-size: 1rem;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+    }
+
+    button {
+      background-color: #007bff;
+      color: white;
+      cursor: pointer;
+      border: none;
+      transition: background 0.2s;
+    }
+
+    button:hover {
+      background-color: #0056b3;
+    }
+
+    .flow-step {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        position: relative;
+    }
+
+
+    .step-card {
+        position: relative;
+        z-index: 2;
+        background: var(--card);
+        padding: 1rem 1.4rem;
+        border-radius: 14px;
+        width: 100%;
+        max-width: 420px;
+        box-shadow: 0 8px 20px rgba(108, 99, 255, 0.12);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border: 1px solid var(--accent-light);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .step-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 12px 28px rgba(108, 99, 255, 0.18);
+    }
+    .step-title {
+        font-weight: 600;
+        font-size: 1rem;
+        letter-spacing: 0.2px;
+    }
+
+    :root {
+        --bg: #f6f7fb;
+        --card: #ffffff;
+        --accent: #6c63ff;      /* soft indigo */
+        --accent-light: #e6e4ff;
+        --text-main: #222;
+        --text-muted: #666;
+        --line: #dcdff5;
+    }
+
+    .connector {
+    width: 2px;
+    height: 28px;
+    background: var(--accent);
+    margin: 0 auto;
+    transform: rotate(2deg);
+    border-radius: 2px;
+    box-shadow: 0 1px 3px rgba(108, 99, 255, 0.25);
+    }
+
+    .substeps {
+      position: relative;
+      z-index: 1;         /* below step-card */
+      margin-top: 0.5rem;
+      background: #fafbff;
+      padding: 0.8rem 1rem;
+      border-radius: 12px;
+      width: 90%;
+      max-width: 380px;
+      border-left: 3px solid var(--accent);
+      animation: fadeIn 0.25s ease;
+    }
+
+
+    .substep {
+      position: relative;
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      gap: 10px;
+      padding: 0.35rem 0;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+    }
+
+    .substeps.hidden {
+    display: none;
+    }
+
+    .task-btn {
+      background: var(--accent-light);
+      color: var(--accent);
+      border: none;
+      border-radius: 50%;
+      height: 35px;
+      aspect-ratio: 1;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s ease, transform 0.15s ease;
+    }
+
+    .task-btn:hover {
+      background: var(--accent);
+      color: white;
+      transform: scale(1.05);
+    }
+
+    .substep-txt {
+      text-decoration: none;
+      background-image: linear-gradient(transparent 0%, transparent 55%, black 60%, transparent 65%, transparent 100%);
+      background-size: 0% 100%;
+      background-repeat: no-repeat;
+      transition: background-size 1s;
+
+      &:hover {
+        background-size: 100% 100%;
+      }
+    }
+
+    .expand-btn {
+        background: var(--accent-light);
+        color: var(--accent);
+        border: none;
+        border-radius: 999px;
+        width: 30px;
+        height: 30px;
+        cursor: pointer;
+        font-size: 1.1rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background 0.2s ease, transform 0.15s ease;
+    }
+
+    .expand-btn:hover {
+        background: var(--accent);
+        color: white;
+        transform: scale(1.05);
+    }
+
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(-4px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+
+    .message {
+      text-align: center;
+      margin-bottom: 1rem;
+      color: #555;
+      font-style: italic;
+    }
+  </style>
+</head>
+<body>
+
+<h1>SkillStack MVP</h1>
+
+<div class="message" id="message"></div>
+
+<form id="skillForm">
+  <label for="skillInput">Enter a skill you want to learn:</label>
+  <input type="text" id="skillInput" placeholder="e.g., Frontend Development" required>
+  <button type="submit">Generate Roadmap</button>
+</form>
+
+<h2>Your Skill Roadmap:</h2>
+<div id="roadmapContainer" class="roadmap"></div>
+
+<script>
+  const form = document.getElementById('skillForm');
+  const skillInput = document.getElementById('skillInput');
+  const roadmapContainer = document.getElementById('roadmapContainer');
+  const message = document.getElementById('message');
+
+  const BACKEND_URL = 'http://127.0.0.1:5000/generate';
+  const USER_ID = 'user123'; // temporary single-user for MVP
+
+  // Load saved skill from localStorage
+  
+  const savedSteps = JSON.parse(localStorage.getItem('currRoadmap') || 'null');
+
+  if (savedSteps) {
+    message.textContent = `Last generated roadmap of ${savedSteps.skill}`;
+    const steps = savedSteps.steps
+    steps.forEach((stepText, index) => {
+        const flowStep = document.createElement('div');
+        flowStep.className = 'flow-step';
+
+        flowStep.innerHTML = `
+            <div class="step-card">
+            <span class="step-title">${index + 1 + ". " + stepText}</span>
+            <button class="expand-btn">+</button>
+            </div>
+
+            <div class="substeps hidden">
+            </div>
+
+            ${index < steps.length - 1 ? '<div class="connector"></div>' : ''}
+            
+        `;
+
+        const button = flowStep.querySelector('.expand-btn');
+        button.addEventListener('click', () => toggleSubsteps(button, stepText, index));
+
+        roadmapContainer.appendChild(flowStep);
+    });
+  }
+    
+
+  form.addEventListener('submit', async function(event) {
+    event.preventDefault();
+    const skill = skillInput.value.trim();
+    if (!skill) return;
+
+    localStorage.clear()
+    generateRoadmap(skill);
+    skillInput.value = '';
+  });
+
+  async function generateRoadmap(skill, isSubstep=false, index) {
+    roadmapContainer.innerHTML = '';
+
+    try {
+      if (!isSubstep) {
+        message.textContent = "Generating roadmap...";
+      }
+      else {
+        message.textContent = "Generating substep...";
+      }
+      const response = await fetch(BACKEND_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ skill: skill, user_id: USER_ID })
+      });
+      const data = await response.json();
+      console.log(data.roadmap)
+      const steps = data.roadmap;
+
+      if (!isSubstep) {
+
+        const roadmap = {
+            skill: skill,
+            steps: steps
+        }
+
+        localStorage.setItem('currRoadmap', JSON.stringify(roadmap));
+
+        if (!steps || steps.length === 0) {
+            message.textContent = "No roadmap generated. Using fallback.";
+            return;
+        }
+
+        message.textContent = `Roadmap generated for "${skill}".`;
+      }
+      else {
+        localStorage.setItem(`skill-${index}`, JSON.stringify(steps))
+      }
+
+    } catch (err) {
+      message.textContent = "Error generating roadmap. Using fallback template.";
+      console.error(err);
+    }
+  }
+
+  
+  function toggleSubsteps(button, step, index) {
+    const substeps = button.closest('.flow-step').querySelector('.substeps');
+    
+    if (!substeps) return;
+
+    substep_list = JSON.parse(localStorage.getItem(`skill-${index}`) || 'null')
+
+    if (substep_list) {
+        if (substeps.children.length === 0) {
+            substep_list.forEach((substepText, index) => {
+                const substep = document.createElement('div')
+                substep.textContent = ``;
+                substep.className = "substep";
+                substep.innerHTML = `
+                  <p><span class="substep-txt">${index+1}.  ${substepText}</span></p>
+                  <button class="task-btn incomplete"></button>
+                `;
+
+                const button = substep.querySelector('.task-btn');
+                button.addEventListener('click', () => toggleComplete(button));
+                substeps.appendChild(substep)
+            });
+        }
+    }
+    else {
+        generateRoadmap(step, true, index)
+    }
+
+    // Toggle visibility
+    const isHidden = substeps.classList.toggle('hidden');
+    
+    // Update button icon
+    button.textContent = isHidden ? '+' : '−';
+  }
+
+  function toggleComplete(button) {
+    substepText = button.closest('.substep').querySelector('.substep-txt');
+
+    const isIncomplete = button.classList.toggle('incomplete')
+
+    substepText.style.backgroundSize = isIncomplete ? '0% 100%' : '100% 100%';
+
+    button.textContent = isIncomplete ? '' : '✓';
+
+
+  }
+    
+
+</script>
+
+</body>
+</html>
